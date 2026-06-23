@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, ShoppingCart, ShieldCheck, Terminal, Send, RefreshCw, 
-  AlertCircle, Database, Sparkles, CheckCircle2, XCircle, AlertTriangle, HelpCircle
+  AlertCircle, Database, Sparkles, AlertTriangle
 } from 'lucide-react';
 import AgentCore3D from './components/AgentCore3D';
 
@@ -10,6 +10,7 @@ interface CustomerProfile {
   name: string;
   email: string;
   tier: string;
+  signup_date: string;
   past_refund_count: number;
 }
 
@@ -82,6 +83,7 @@ export default function App() {
   const [adminLogs, setAdminLogs] = useState<AdminLog[]>([]);
   const [claimsList, setClaimsList] = useState<RefundClaim[]>([]);
   const [activeAdminTab, setActiveAdminTab] = useState<'traces' | 'claims'>('traces');
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
   
   // WebSockets references
   const chatSocketRef = useRef<WebSocket | null>(null);
@@ -330,6 +332,20 @@ export default function App() {
             )}
           </div>
           
+          {/* Admin panel toggle button */}
+          <button 
+            onClick={() => setShowAdminPanel(prev => !prev)}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition duration-200 border ${
+              showAdminPanel 
+                ? 'bg-purple-900/40 text-purple-400 border-purple-800/40 hover:bg-purple-900/60' 
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-850'
+            }`}
+            title="Toggle Admin reasoning logs and transaction claims list panel"
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span>{showAdminPanel ? 'Admin View: ON' : 'Admin View: OFF'}</span>
+          </button>
+
           <button 
             onClick={fetchCustomers}
             className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-white transition duration-200"
@@ -355,9 +371,9 @@ export default function App() {
 
       {/* Main Split Layout */}
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden h-[calc(100vh-65px)]">
-        
+
         {/* ================= LEFT SIDE: CUSTOMER HUB ================= */}
-        <section className="w-full lg:w-[35%] border-r border-slate-900 flex flex-col bg-slate-950 overflow-y-auto">
+        <section className={`w-full ${showAdminPanel ? 'lg:w-1/2' : 'lg:w-[35%]'} border-r border-slate-900 flex flex-col bg-slate-950 overflow-y-auto`}>
           {/* Customer Selection Toolbar */}
           <div className="p-4 border-b border-slate-900 bg-slate-950 flex flex-col space-y-3">
             <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
@@ -473,76 +489,325 @@ export default function App() {
             </div>
           )}
 
-          {/* Interactive 3D Decision engine core sphere (Visual Indicator) */}
-          <div className="p-4 flex-1 flex flex-col min-h-[260px] bg-slate-950">
-            <AgentCore3D />
-          </div>
+          {/* If admin panel is open, we display the Chat panel on the left under the customer workspace to allow chat */}
+          {showAdminPanel ? (
+            <div className="flex-1 flex flex-col min-h-[350px] bg-slate-950">
+              {/* Chat Messenger Panel (compact view) */}
+              <div className="p-3 border-b border-slate-900 bg-slate-950 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Customer Chat Sim</span>
+                <span className="text-[9px] text-slate-500">WebSocket Session</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 flex flex-col max-h-[300px]">
+                {chatMessages.map((msg, index) => (
+                  <div 
+                    key={index} 
+                    className={`flex flex-col max-w-[85%] ${
+                      msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'
+                    }`}
+                  >
+                    <div className={`px-3 py-2 rounded-xl text-[11px] leading-relaxed ${
+                      msg.sender === 'user' 
+                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-none shadow-lg' 
+                        : 'bg-slate-900 border border-slate-850 text-slate-200 rounded-bl-none'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {isAgentThinking && agentStatus && (
+                  <div className="self-start flex items-center space-x-1.5 text-[9px] text-purple-400 bg-purple-950/20 border border-purple-900/30 px-2.5 py-1 rounded-full animate-pulse">
+                    <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                    <span>{agentStatus}</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+              <div className="p-2 border-t border-slate-900 bg-slate-950 flex space-x-2">
+                <input
+                  type="text"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Ask for refund..."
+                  disabled={isAgentThinking || !dbConnected}
+                  className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={isAgentThinking || !userInput.trim() || !dbConnected}
+                  className="bg-purple-600 hover:bg-purple-500 text-white px-3.5 rounded-lg text-xs"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 flex-1 flex flex-col min-h-[260px] bg-slate-950">
+              {/* Otherwise, display the interactive 3D visualizer orb */}
+              <AgentCore3D />
+            </div>
+          )}
         </section>
 
-        {/* ================= RIGHT SIDE: CHAT MESSENGER ================= */}
-        <section className="w-full lg:w-[65%] flex flex-col bg-slate-950 overflow-hidden">
-          {/* Chat Messenger Header */}
-          <div className="p-4 border-b border-slate-900 bg-slate-950 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">AI Refund Agent Assistant</span>
-            </div>
-            <div className="text-[10px] text-slate-500 font-mono">Status: Active (Local Policy Mode)</div>
-          </div>
-
-          {/* Scrollable messages container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col">
-            {chatMessages.map((msg, index) => (
-              <div 
-                key={index} 
-                className={`flex flex-col max-w-[85%] ${
-                  msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'
-                }`}
+        {/* ================= RIGHT SIDE SECTION ================= */}
+        {showAdminPanel ? (
+          <section className="w-full lg:w-1/2 flex flex-col bg-slate-950 overflow-hidden">
+            {/* ================= RIGHT SIDE: ADMIN VIEW ================= */}
+            {/* Admin Panels Menu Tabs */}
+            <div className="border-b border-slate-900 bg-slate-950/90 flex justify-between items-center px-4 py-2">
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setActiveAdminTab('traces')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold transition duration-200 ${
+                    activeAdminTab === 'traces' 
+                      ? 'bg-purple-900/40 text-purple-400 border border-purple-800/40' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Terminal className="h-3.5 w-3.5" />
+                  <span>Live Reasoning Traces</span>
+                </button>
+                
+                <button
+                  onClick={() => setActiveAdminTab('claims')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold transition duration-200 ${
+                    activeAdminTab === 'claims' 
+                      ? 'bg-purple-900/40 text-purple-400 border border-purple-800/40' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Database className="h-3.5 w-3.5" />
+                  <span>Refund Claims Log</span>
+                </button>
+              </div>
+              
+              <button 
+                onClick={fetchClaims}
+                className="p-1 hover:bg-slate-900 rounded text-slate-400 hover:text-slate-200"
+                title="Refresh database records"
               >
-                <div className={`px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
-                  msg.sender === 'user' 
-                    ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-none shadow-lg shadow-violet-950/30' 
-                    : 'bg-slate-900 border border-slate-850 text-slate-200 rounded-bl-none'
-                }`}>
-                  {msg.text}
-                  {msg.isStreaming && (
-                    <span className="inline-block w-1.5 h-3 ml-1 bg-purple-400 animate-pulse align-middle"></span>
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Live Traces Tab view */}
+            {activeAdminTab === 'traces' ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                
+                {/* 3D Core Visualizer & System Architecture Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border-b border-slate-900 bg-slate-900/10">
+                  {/* 3D Agent Core Graphic */}
+                  <div className="h-full">
+                    <AgentCore3D />
+                  </div>
+                  
+                  {/* Visual Architecture Mini-card */}
+                  <div className="bg-slate-900/40 border border-slate-900 rounded-2xl p-4 flex flex-col justify-between text-xs">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center space-x-1.5 text-purple-400 font-bold uppercase tracking-wider text-[10px]">
+                        <ShieldCheck className="h-4 w-4" />
+                        <span>Security & Policy Engine</span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                        LangGraph orchestrates the refund evaluation. First, it extracts identifiers, fetches full profile history, embeds context to search rules in <span className="text-slate-200 font-semibold">pgvector</span>, and checks customer frequencies and caps prior to deciding.
+                      </p>
+                    </div>
+                    
+                    {/* System limits table */}
+                    <div className="mt-3 border-t border-slate-900 pt-2 space-y-1 text-[10px] text-slate-500 font-medium">
+                      <div className="flex justify-between">
+                        <span>Annual Refund Limit:</span>
+                        <span className="text-slate-300 font-semibold">$200.00</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Standard Restocking Fee:</span>
+                        <span className="text-slate-300 font-semibold">10%</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-rose-500">
+                        <span>Abuse Escalation Trigger:</span>
+                        <span>&ge; 3 Refunds</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scrolling Console Logs Terminal */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-black/40 font-mono">
+                  {adminLogs.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-600">
+                      <Terminal className="h-10 w-10 mb-2 opacity-50" />
+                      <p className="text-xs">Console is listening. Ask the customer bot a refund question on the left to trigger the LangGraph execution flow.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-[10px] text-purple-400 font-bold border-b border-purple-900/30 pb-1 flex items-center">
+                        <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping mr-2"></span>
+                        LIVE STATE MACHINE EXECUTION TRACES
+                      </div>
+                      {adminLogs.map((log) => (
+                        <div key={log.id} className="bg-slate-950 border border-slate-900 rounded-lg overflow-hidden text-[11px]">
+                          {/* Header */}
+                          <div className="bg-slate-900/60 px-3 py-1.5 flex justify-between items-center text-[10px] text-slate-400 border-b border-slate-900">
+                            <span className="font-bold flex items-center">
+                              <span className="h-2 w-2 rounded bg-purple-600 inline-block mr-1.5"></span>
+                              NODE: {log.trace.node.toUpperCase()}
+                            </span>
+                            <span>Session: {log.customer_name} (#{log.customer_id}) • {log.timestamp}</span>
+                          </div>
+                          
+                          {/* Log fields */}
+                          <div className="p-2.5 space-y-1.5">
+                            {log.trace.tool_called !== "None" && (
+                              <div>
+                                <span className="text-blue-400 font-semibold">Tool Invoke:</span>{' '}
+                                <code className="text-blue-300 bg-blue-950/30 px-1 py-0.5 rounded text-[10px]">
+                                  {log.trace.tool_called}({log.trace.tool_input})
+                                </code>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-emerald-400 font-semibold">Tool Return:</span>{' '}
+                              <span className="text-slate-300">{log.trace.tool_output}</span>
+                            </div>
+                            <div className="border-t border-slate-900/50 pt-1.5 mt-1.5">
+                              <span className="text-indigo-400 font-semibold">Agent Reasoning:</span>{' '}
+                              <span className="text-slate-400 italic">{log.trace.reasoning}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={logsEndRef} />
+                    </div>
                   )}
                 </div>
               </div>
-            ))}
-            
-            {/* Agent Thinking States */}
-            {isAgentThinking && agentStatus && (
-              <div className="self-start flex items-center space-x-2 text-[10px] text-purple-400 font-medium bg-purple-950/20 border border-purple-900/30 px-3 py-1.5 rounded-full animate-pulse">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                <span>{agentStatus}</span>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {/* Claims Tab view */}
+                <div className="flex items-center space-x-1.5 pb-2 border-b border-slate-900">
+                  <Database className="h-4 w-4 text-purple-400" />
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Historical Postgres Transactions</span>
+                </div>
+                
+                {claimsList.length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-slate-500 text-xs">
+                    <Database className="h-8 w-8 mb-2 opacity-55" />
+                    <span>No claims recorded in database yet.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {claimsList.map((claim) => (
+                      <div key={claim.id} className="bg-slate-900/40 border border-slate-900 p-3 rounded-xl flex flex-col space-y-2 text-xs">
+                        
+                        {/* Top claim line */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-200">{claim.customer_name} ({claim.customer_tier.toUpperCase()})</span>
+                            <span className="text-[10px] text-slate-500">Order: <strong className="text-slate-400 font-normal">{claim.order_id}</strong> ({claim.item_name})</span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
+                              claim.status === 'approved' 
+                                ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900'
+                                : claim.status === 'denied'
+                                ? 'bg-rose-950/50 text-rose-400 border-rose-900'
+                                : 'bg-amber-950/50 text-amber-400 border-amber-900'
+                            }`}>
+                              {claim.status}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-bold mt-1">
+                              {claim.amount > 0 ? `$${claim.amount.toFixed(2)}` : '-'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Decider rationale */}
+                        <div className="bg-slate-950/60 p-2 rounded text-[11px] border border-slate-900 text-slate-400 space-y-1">
+                          <p><strong className="text-slate-300 font-medium">Policy Rationale:</strong> {claim.reason}</p>
+                          {claim.citation && (
+                            <p className="text-[10px] text-purple-400 italic">
+                              <strong className="text-purple-300 not-italic font-medium">Source:</strong> &ldquo;{claim.citation}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="text-[9px] text-slate-600 flex justify-between">
+                          <span>Transaction Timestamp: {claim.created_at}</span>
+                          <span>Claim #{claim.id}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            
-            <div ref={chatEndRef} />
-          </div>
+          </section>
+        ) : (
+          <section className="w-full lg:w-[65%] flex flex-col bg-slate-950 overflow-hidden">
+            {/* ================= RIGHT SIDE: CHAT MESSENGER (Default Clean Chat Panel) ================= */}
+            {/* Chat Messenger Header */}
+            <div className="p-4 border-b border-slate-900 bg-slate-950 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">AI Refund Agent Assistant</span>
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono">Status: Active (Local Policy Mode)</div>
+            </div>
 
-          {/* Chat Input Field */}
-          <div className="p-3 border-t border-slate-900 bg-slate-950/50 flex space-x-2">
-            <input
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Ask about a refund (e.g. 'I want a refund for ORD-001')"
-              disabled={isAgentThinking || !dbConnected}
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none disabled:opacity-50"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={isAgentThinking || !userInput.trim() || !dbConnected}
-              className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white p-3 rounded-xl transition shadow-lg shadow-purple-950/20 disabled:shadow-none flex items-center justify-center"
-            >
-              <Send className="h-4.5 w-4.5" />
-            </button>
-          </div>
-        </section>
+            {/* Scrollable messages container */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col">
+              {chatMessages.map((msg, index) => (
+                <div 
+                  key={index} 
+                  className={`flex flex-col max-w-[85%] ${
+                    msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'
+                  }`}
+                >
+                  <div className={`px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
+                    msg.sender === 'user' 
+                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-none shadow-lg shadow-violet-950/30' 
+                      : 'bg-slate-900 border border-slate-850 text-slate-200 rounded-bl-none'
+                  }`}>
+                    {msg.text}
+                    {msg.isStreaming && (
+                      <span className="inline-block w-1.5 h-3 ml-1 bg-purple-400 animate-pulse align-middle"></span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Agent Thinking States */}
+              {isAgentThinking && agentStatus && (
+                <div className="self-start flex items-center space-x-2 text-[10px] text-purple-400 font-medium bg-purple-950/20 border border-purple-900/30 px-3 py-1.5 rounded-full animate-pulse">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <span>{agentStatus}</span>
+                </div>
+              )}
+              
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input Field */}
+            <div className="p-3 border-t border-slate-900 bg-slate-950/50 flex space-x-2">
+              <input
+                type="text"
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Ask about a refund (e.g. 'I want a refund for ORD-001')"
+                disabled={isAgentThinking || !dbConnected}
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none disabled:opacity-50"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={isAgentThinking || !userInput.trim() || !dbConnected}
+                className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white p-3 rounded-xl transition shadow-lg shadow-purple-950/20 disabled:shadow-none flex items-center justify-center"
+              >
+                <Send className="h-4.5 w-4.5" />
+              </button>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
