@@ -1,0 +1,24 @@
+# Virtual environment
+backend/venv/
+venv/
+
+# Environment variables (private keys)
+.env
+backend/.env
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Python cache files
+__pycache__/
+backend/__pycache__/
+*.pyc
+
+# Local logs
+*.log
+monitor.log
+
+# System files
+.DS_Store
+Thumbs.db
